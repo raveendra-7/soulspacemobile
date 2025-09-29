@@ -107,6 +107,80 @@ const shuffleArray = (array) => {
 };
 
 /**
+ * Meditation Modal Component (NEW)
+ */
+const MeditationModal = ({ show, onClose, meditation }) => {
+    if (!meditation) return null;
+
+    const [timeLeft, setTimeLeft] = useState(0);
+    const durationMinutes = parseInt(meditation.duration.split(' ')[0]) || 5;
+    const durationSeconds = durationMinutes * 60;
+    const timerRef = useRef(null);
+
+    useEffect(() => {
+        if (show) {
+            setTimeLeft(durationSeconds);
+            timerRef.current = setInterval(() => {
+                setTimeLeft(prevTime => {
+                    if (prevTime <= 1) {
+                        clearInterval(timerRef.current);
+                        onClose(); // Close modal when finished
+                        return 0;
+                    }
+                    return prevTime - 1;
+                });
+            }, 1000);
+        } else {
+            clearInterval(timerRef.current);
+        }
+
+        return () => clearInterval(timerRef.current);
+    }, [show, durationSeconds, onClose]);
+
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const progress = (1 - (timeLeft / durationSeconds)) * 100;
+
+    return (
+        <div className={`modal fade ${show ? 'show d-block' : 'd-none'}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content rounded-4 shadow-lg text-center p-3">
+                    <div className="modal-header border-0 pb-0">
+                        <h5 className="modal-title fw-bold text-primary">{meditation.title}</h5>
+                        <button type="button" className="btn-close" onClick={onClose} aria-label="Close"></button>
+                    </div>
+                    <div className="modal-body">
+                        <span className="display-1">{meditation.icon}</span>
+                        <p className="lead fw-bolder mt-3 text-secondary">
+                            {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                        </p>
+                        <p className="small text-muted mb-4">Focus on your breathing. Inhale, exhale.</p>
+                        
+                        <div className="progress rounded-pill shadow-sm" style={{ height: '10px' }}>
+                            <div 
+                                className="progress-bar rounded-pill" 
+                                role="progressbar" 
+                                style={{ width: `${progress}%`, backgroundColor: meditation.color.replace('bg-', '#') }} 
+                                aria-valuenow={progress} 
+                                aria-valuemin="0" 
+                                aria-valuemax="100"
+                            ></div>
+                        </div>
+
+                    </div>
+                    <div className="modal-footer border-0 pt-0 justify-content-center">
+                         <button type="button" className="btn btn-danger rounded-pill" onClick={onClose}>
+                            Stop Meditation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+/**
  * Mood Selection Component
  */
 const MoodTracker = ({ selectedMood, setSelectedMood, saveMood, moodLog, isSaving }) => {
@@ -293,12 +367,13 @@ const DailyJournal = ({ journalEntries, isSavingJournal, setIsSavingJournal, sav
 /**
  * Meditation Library Component
  */
-const MeditationLibrary = () => {
+const MeditationLibrary = ({ startMeditation }) => {
+    // Note: Colors need to be converted from bg-x to hex for the progress bar styling
     const MEDITATIONS = [
-        { title: "Quick Focus", duration: "5 min", color: "bg-warning", icon: "🧠" },
-        { title: "Sleep Prep", duration: "10 min", color: "bg-primary", icon: "💤" },
-        { title: "Social Anxiety Relief", duration: "15 min", color: "bg-danger", icon: "🫂" },
-        { title: "Mindful Eating", duration: "8 min", color: "bg-success", icon: "🍎" },
+        { title: "Quick Focus", duration: "5 min", color: "#ffc107", icon: "🧠", description: "A rapid session to reset focus and clear the mind." }, // warning
+        { title: "Sleep Prep", duration: "10 min", color: "#0d6efd", icon: "💤", description: "Wind down your thoughts and prepare your body for deep rest." }, // primary
+        { title: "Social Anxiety Relief", duration: "15 min", color: "#dc3545", icon: "🫂", description: "Grounding techniques to reduce nervousness in social settings." }, // danger
+        { title: "Mindful Eating", duration: "8 min", color: "#198754", icon: "🍎", description: "Focusing on the senses to enjoy your food and slow down." }, // success
     ];
 
     return (
@@ -310,15 +385,19 @@ const MeditationLibrary = () => {
             
             <div className="space-y-3">
                 {MEDITATIONS.map((m) => (
-                    <div key={m.title} className={`d-flex justify-content-between align-items-center p-4 rounded-3 shadow transition hover-scale-101 cursor-pointer ${m.color} text-white fw-bold`}>
+                    <div key={m.title} className={`d-flex justify-content-between align-items-center p-4 rounded-3 shadow transition hover-scale-101 cursor-pointer bg-light fw-bold`}
+                         style={{ backgroundColor: m.color + '22' }}> 
                         <div className="d-flex align-items-center">
                             <span className="fs-3 me-3">{m.icon}</span>
                             <div>
-                                <h2 className="h5 mb-0">{m.title}</h2>
-                                <p className="small fw-medium opacity-75 mb-0">{m.duration}</p>
+                                <h2 className="h5 mb-0 text-dark">{m.title}</h2>
+                                <p className="small fw-medium opacity-75 mb-0 text-dark">{m.duration}</p>
                             </div>
                         </div>
-                        <button className="btn btn-light text-dark px-4 py-2 rounded-pill small fw-semibold shadow-sm hover-scale-105 active-scale-95">
+                        <button 
+                            onClick={() => startMeditation(m)}
+                            className="btn btn-primary text-white px-4 py-2 rounded-pill small fw-semibold shadow-sm hover-scale-105 active-scale-95"
+                        >
                             Start
                         </button>
                     </div>
@@ -332,11 +411,47 @@ const MeditationLibrary = () => {
  * Safe Space (Mock Community Hub) Component
  */
 const SafeSpace = () => {
-    const MOCK_POSTS = [
+    // State to manage user's new post input
+    const [newPostText, setNewPostText] = useState('');
+    const [selectedPostMood, setSelectedPostMood] = useState(MOOD_OPTIONS[0]); // Default to Joyful
+    
+    // State for initial mock posts and user-submitted posts
+    const [mockPosts, setMockPosts] = useState([
         { user: "KindSoul42", mood: "😌 Calm", text: "Just finished a great focus session. Feeling centered and ready for the week ahead! ✨", color: "border-success", icon: "😌" },
         { user: "PixelPanda", mood: "😩 Stressed", text: "Midterms are hitting hard. Anyone else feeling overwhelmed? Deep breaths...", color: "border-danger", icon: "😩" },
         { user: "Z_Gen_Vibes", mood: "😊 Joyful", text: "Logged a 7-day mood streak! Small wins matter! Celebrating with some comfy socks. 🥳", color: "border-warning", icon: "😊" },
-    ];
+    ]);
+
+    const handlePost = () => {
+        if (!selectedPostMood || newPostText.trim() === '') {
+            return; // Don't post if mood or text is missing
+        }
+
+        const newPost = {
+            user: "Guest_" + Math.floor(Math.random() * 9999), // Anonymous Guest ID
+            mood: `${selectedPostMood.emoji} ${selectedPostMood.name}`,
+            text: newPostText.trim(),
+            color: MOOD_OPTIONS.find(m => m.name === selectedPostMood.name)?.colorClass.replace('-subtle', '') || 'border-info',
+            icon: selectedPostMood.emoji,
+        };
+
+        // Prepend new post to the top of the list
+        setMockPosts([newPost, ...mockPosts]);
+        setNewPostText('');
+        setSelectedPostMood(MOOD_OPTIONS[0]);
+    };
+
+    const PostMoodButton = ({ mood }) => (
+        <button
+            onClick={() => setSelectedPostMood(mood)}
+            className={`d-flex flex-column align-items-center justify-content-center p-2 rounded-3 transition border-0 ${mood.colorClass} 
+                        ${selectedPostMood?.name === mood.name ? 'border border-3 border-primary' : ''}`}
+            title={mood.name}
+            style={{ width: '40px', height: '40px' }}
+        >
+            <span className="fs-5">{mood.emoji}</span>
+        </button>
+    );
 
     return (
         <div className="p-2 space-y-4">
@@ -346,24 +461,37 @@ const SafeSpace = () => {
             <p className="text-secondary">Connect with others in a supportive, anonymous community.</p>
 
             <div className="p-3 bg-light rounded-3 border border-primary-subtle">
+                <p className="text-dark-emphasis fw-bold mb-2">Share your feelings anonymously:</p>
+                
+                <textarea
+                    value={newPostText}
+                    onChange={(e) => setNewPostText(e.target.value)}
+                    placeholder="Type your thought..."
+                    rows="3"
+                    className="form-control mb-3 rounded-3 shadow-sm resize-none"
+                />
+
                 <div className="d-flex justify-content-between align-items-center">
-                    <p className="text-dark-emphasis mb-0">Share your current feeling:</p>
-                    <button className="btn btn-primary text-white px-3 py-1 rounded-pill small fw-semibold hover-scale-105 active-scale-95">
-                        Post Anonymously
+                    <div className="d-flex gap-2 flex-wrap">
+                        {MOOD_OPTIONS.map(m => <PostMoodButton key={m.name} mood={m} />)}
+                    </div>
+                    <button 
+                        onClick={handlePost}
+                        disabled={!selectedPostMood || newPostText.trim() === ''}
+                        className="btn btn-primary text-white px-3 py-1 rounded-pill small fw-semibold hover-scale-105 active-scale-95"
+                    >
+                        Post
                     </button>
-                </div>
-                <div className="fs-3 mt-3 d-flex gap-2">
-                    {MOOD_OPTIONS.map(m => <span key={m.name} title={m.name}>{m.emoji}</span>)}
                 </div>
             </div>
 
-            <div className="space-y-3">
-                {MOCK_POSTS.map((post, index) => (
+            <div className="space-y-3 pt-3">
+                {mockPosts.map((post, index) => (
                     <div key={index} className={`p-3 bg-white rounded-3 shadow-sm border-start border-4 ${post.color}`}>
                         <div className="d-flex align-items-center mb-2">
                             <span className="fs-5 me-2">{post.icon}</span>
                             <span className="fw-bold text-dark">{post.user}</span>
-                            <span className="ms-3 small fw-semibold px-2 py-0 bg-light rounded-pill text-dark-emphasis">{post.mood}</span>
+                            <span className={`ms-3 small fw-semibold px-2 py-0 bg-light rounded-pill text-dark-emphasis`}>{post.mood}</span>
                         </div>
                         <p className="text-dark-emphasis mb-0">{post.text}</p>
                     </div>
@@ -528,13 +656,29 @@ const App = () => {
     // State for Navigation
     const [currentPage, setCurrentPage] = useState('mood'); 
     
+    // State for Meditation
+    const [showMeditationModal, setShowMeditationModal] = useState(false);
+    const [currentMeditation, setCurrentMeditation] = useState(null);
+
     // State for Mood Tracking Interaction
     const [selectedMood, setSelectedMood] = useState(null);
     const [isSavingMood, setIsSavingMood] = useState(false);
     const [isSavingJournal, setIsSavingJournal] = useState(false);
 
+    // Function to start a meditation session
+    const startMeditation = (meditation) => {
+        setCurrentMeditation(meditation);
+        setShowMeditationModal(true);
+    };
+
+    // Function to close meditation modal
+    const closeMeditationModal = () => {
+        setShowMeditationModal(false);
+        setCurrentMeditation(null);
+    };
+
     // Handle saving the selected mood
-    const saveMood = async () => {
+    const saveMood = () => {
         if (!userId || !selectedMood) return;
 
         setIsSavingMood(true);
@@ -589,7 +733,8 @@ const App = () => {
                 // Pass the simplified, synchronous save function
                 return <DailyJournal {...{ journalEntries, isSavingJournal, setIsSavingJournal, saveJournalData: saveJournal }}/>;
             case 'meditation':
-                return <MeditationLibrary />;
+                // Pass the startMeditation function down
+                return <MeditationLibrary {...{ startMeditation }}/>;
             case 'safeSpace':
                 return <SafeSpace />;
             case 'game':
@@ -621,7 +766,7 @@ const App = () => {
                 crossOrigin="anonymous" 
             />
 
-            <div className="app-container w-100 bg-white shadow-lg rounded-0 d-flex flex-column" style={{ maxWidth: '400px', minHeight: '100vh', height: '100dvh', overflow: 'hidden' }}>
+            <div className="app-container w-100 bg-white shadow-lg rounded-0 d-flex flex-column" style={{ maxWidth: '400px', height: '100dvh', overflow: 'hidden' }}>
                 
                 {/* Header */}
                 <header className="p-3 bg-white border-bottom border-light-subtle d-flex justify-content-between align-items-center flex-shrink-0">
@@ -652,6 +797,9 @@ const App = () => {
                 </nav>
             </div>
             
+            {/* Meditation Modal (Rendered outside the main app container) */}
+            <MeditationModal show={showMeditationModal} onClose={closeMeditationModal} meditation={currentMeditation} />
+
             {/* Bootstrap JS is required for modals, tooltips, etc. */}
             <script 
                 src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" 
@@ -675,10 +823,42 @@ const App = () => {
                         overflow-x: hidden; 
                     }
                     
+                    /* Custom utility styles */
+                    .transition {
+                        transition: all 0.2s ease-in-out;
+                    }
+                    .hover-scale-101:hover {
+                        transform: scale(1.01);
+                    }
+                    .active-scale-95:active {
+                        transform: scale(0.95);
+                    }
+                    .resize-none {
+                        resize: none;
+                    }
+                    .animate-spin {
+                        animation: spin 1s linear infinite;
+                    }
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+
                     /* Set primary color for better pastels */
                     .text-primary { color: #6a0dad !important; } /* Deep Purple */
                     .bg-primary-subtle { background-color: #e6e0f2 !important; }
-
+                    /* Secondary colors for mood buttons */
+                    .bg-warning { background-color: #ffc107 !important; }
+                    .bg-success { background-color: #198754 !important; }
+                    .bg-info { background-color: #0dcaf0 !important; }
+                    .bg-danger { background-color: #dc3545 !important; }
+                    .bg-primary { background-color: #0d6efd !important; }
+                    .bg-secondary { background-color: #6c757d !important; }
+                    
+                    .bg-warning-subtle { background-color: #fff3cd !important; }
+                    .bg-success-subtle { background-color: #d1e7dd !important; }
+                    .bg-info-subtle { background-color: #cff4fc !important; }
+                    .bg-danger-subtle { background-color: #f8d7da !important; }
+                    
                     /* === MOBILE OPTIMIZATION === */
                     /* Ensure the whole body wrapper is 100vh */
                     .min-vh-100 {
@@ -689,25 +869,25 @@ const App = () => {
                     
                     .app-container {
                         min-height: 100vh !important;
-                        height: 100vh;
+                        height: 100dvh; /* Use dynamic height for accurate mobile sizing */
                         border-radius: 0 !important; /* Full app look */
                         box-shadow: none !important;
-                        /* Force container content to flex */
+                        max-width: 100% !important; 
+                        
+                        /* Layout adjustment */
                         display: flex; 
                         flex-direction: column;
                     }
                     
-                    /* Resetting body padding that Bootstrap might add */
+                    /* Resetting container padding added by App's parent flex */
                     .min-vh-100 {
                         padding: 0 !important;
                         margin: 0 !important;
                     }
                     
                     /* Ensure content pages don't have large padding that causes overflow */
-                    .p-2 { padding: 0.5rem !important; }
-                    .p-3 { padding: 1rem !important; }
-                    .p-4 { padding: 1.5rem !important; }
-                    .p-5 { padding: 3rem !important; }
+                    /* Reduced padding in components to p-2 for tight mobile fit */
+
                 `}
             </style>
         </div>
@@ -715,4 +895,3 @@ const App = () => {
 };
 
 export default App;
-
