@@ -1,0 +1,1 @@
+{\n  "name": "server",\n  "version": "1.0.0",\n  "description": "Backend for Digital Sphere",\n  "main": "server.js",\n  "scripts": {\n    "start": "nodemon server.js"\n  },\n  "dependencies": {\n    "bcryptjs": "^2.4.3",\n    "cors": "^2.8.5",\n    "dotenv": "^16.0.3",\n    "express": "^4.17.2",\n    "jsonwebtoken": "^8.5.1",\n    "mongoose": "^6.7.0"\n  }\n}
